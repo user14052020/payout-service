@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_DB: payouts
+          POSTGRES_USER: payouts
+          POSTGRES_PASSWORD: payouts
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U payouts -d payouts"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      DEBUG: 0
+      SECRET_KEY: ci-secret
+      ALLOWED_HOSTS: '*'
+      POSTGRES_DB: payouts
+      POSTGRES_USER: payouts
+      POSTGRES_PASSWORD: payouts
+      POSTGRES_HOST: 127.0.0.1
+      POSTGRES_PORT: 5432
+      CELERY_TASK_ALWAYS_EAGER: 1
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install dependencies
+        working-directory: payout-service
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install mypy
+      - name: Run migrations
+        working-directory: payout-service
+        run: python manage.py migrate
+      - name: Run tests
+        working-directory: payout-service
+        run: python manage.py test
+      - name: Type check
+        working-directory: payout-service
+        run: mypy payout_service payouts
